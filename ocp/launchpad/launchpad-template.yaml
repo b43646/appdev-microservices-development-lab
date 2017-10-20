@@ -28,7 +28,6 @@ parameters:
     Leave the default value when targetting the same OpenShift/Minishift you are
     running this on
   value: https://openshift.default.svc.cluster.local
-  required: true
 - name: LAUNCHPAD_MISSIONCONTROL_OPENSHIFT_CONSOLE_URL
   displayName: Target OpenShift Console URL
   description: The base URL of the OpenShift Console where the launched boosters
@@ -37,7 +36,6 @@ parameters:
     can most likely look at this page's address bar of your browser and copy the URL
     Example value (https://$HOSTNAMEORIP:8443)
   value:
-  required: true
 - name: LAUNCHPAD_MISSIONCONTROL_OPENSHIFT_USERNAME
   displayName: OpenShift user name
   description: OpenShift user (leave empty when using Keycloak)
@@ -56,7 +54,7 @@ parameters:
   displayName: KeyCloak Realm
   description: The keycloak realm to be used (leave empty if you've explicitly specified
     GitHub/OpenShift authentication above)
-  value: osio-launch-prod
+  value: rh-developers-launch
 - name: LAUNCHPAD_TRACKER_SEGMENT_TOKEN
   displayName: Segment Token
   description: The token to use for Segment tracking. Leaving this empty will disable
@@ -69,26 +67,35 @@ parameters:
 - name: LAUNCHPAD_BACKEND_CATALOG_GIT_REF
   displayName: Catalog Git Reference
   description: The Git reference to use for the above repository
-  value: master
+  value: v11
   required: true
+- name: LAUNCHPAD_BACKEND_CATALOG_REINDEX_TOKEN
+  displayName: Catalog Reindex Token
+  description: A token that must be passed to the catalog reindex service to trigger the catalog
+    reindexing.
+  value:
 - name: MISSIONCONTROL_IMAGE
   value: openshiftio/launchpad-missioncontrol
   required: true
 - name: MISSIONCONTROL_IMAGE_TAG
-  value: v10
+  value: latest
   required: true
 - name: BACKEND_IMAGE
   value: openshiftio/launchpad-backend
   required: true
 - name: BACKEND_IMAGE_TAG
-  value: v9
+  value: latest
   required: true
 - name: FRONTEND_IMAGE
   value: openshiftio/launchpad-frontend
   required: true
 - name: FRONTEND_IMAGE_TAG
-  value: v9
+  value: latest
   required: true
+- name: PROXY_IMAGE
+  value: registry.devshift.net/openshiftio/launchpad-nginx
+- name: PROXY_IMAGE_TAG
+  value: latest
 objects:
 - kind: ConfigMap
   apiVersion: v1
@@ -103,124 +110,32 @@ objects:
     launchpad.missioncontrol.openshift.console.url: ${LAUNCHPAD_MISSIONCONTROL_OPENSHIFT_CONSOLE_URL}
     launchpad.backend.catalog.git.repository: ${LAUNCHPAD_BACKEND_CATALOG_GIT_REPOSITORY}
     launchpad.backend.catalog.git.ref: ${LAUNCHPAD_BACKEND_CATALOG_GIT_REF}
+    launchpad.backend.catalog.reindex.token: ${LAUNCHPAD_BACKEND_CATALOG_REINDEX_TOKEN}
     launchpad.keycloak.url: ${LAUNCHPAD_KEYCLOAK_URL}
     launchpad.keycloak.realm: ${LAUNCHPAD_KEYCLOAK_REALM}
     launchpad.tracker.segment.token: ${LAUNCHPAD_TRACKER_SEGMENT_TOKEN}
 - kind: ConfigMap
   apiVersion: v1
   metadata:
-    name: launchpad-nginx
-  data:
-    nginx.conf: |-
-      daemon off;
-  
-      error_log /dev/stdout debug;
-      pid /run/nginx.pid; 
-  
-      events {
-          worker_connections  1024;
-      }
-  
-      http {
-  
-          default_type  application/octet-stream;
-  
-          log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                            '$status $body_bytes_sent "$http_referer" '
-                            '"$http_user_agent" "$http_x_forwarded_for"';
-  
-          access_log /dev/stdout;
-  
-          access_log          /dev/stdout main;                                                                                                                                                                                              
-          client_body_temp_path /tmp;                                                                                                                                                                                                        
-          fastcgi_temp_path /tmp;                                                                                                                                                                                                            
-          scgi_temp_path /tmp;                                                                                                                                                                                                               
-          proxy_temp_path /tmp;                                                                                                                                                                                                              
-          uwsgi_temp_path /tmp;                                                                                                                                                                                                              
-          sendfile            on;                                                                                                                                                                                                            
-          tcp_nopush          on;                                                                                                                                                                                                            
-          tcp_nodelay         on;                                                                                                                                                                                                            
-          keepalive_timeout   65;                                                                                                                                                                                                            
-          types_hash_max_size 2048;                                                                                                                                                                                                          
-                                                                                                                                                                                                                                            
-          include             /etc/nginx/mime.types;   
-          
-          upstream backend {
-            server launchpad-backend:8080;
-          }      
-  
-          upstream frontend {
-            server launchpad-frontend:8080;
-          }      
-  
-          upstream missioncontrol {
-            server launchpad-missioncontrol:8080;
-          }                 
-  
-  
-          server {
-  
-              client_body_temp_path /tmp/nginx_client_temp 1 2;
-  
-              listen       8080;
-              root         /usr/share/nginx/html;
-  
-              
-  
-              location / {
-                add_header 'Access-Control-Allow-Origin' "$http_origin";
-                add_header 'Access-Control-Allow-Credentials' 'true';
-                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
-  
-                proxy_pass http://frontend/;
-              }
-  
-              location /status/ {
-                proxy_pass http://missioncontrol/status/;
-                proxy_http_version 1.1;
-                proxy_set_header Upgrade $http_upgrade;
-                proxy_set_header Connection "upgrade";
-              }
-  
-              location /launchpad/ {
-                add_header 'Access-Control-Allow-Origin' "$http_origin";
-                add_header 'Access-Control-Allow-Credentials' 'true';
-                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
-  
-                proxy_pass http://backend/launchpad/;
-              }
-          }
-      }
-- kind: ImageStream
-  apiVersion: v1
-  metadata:
-    name: launchpad-backend
-  spec:
-    tags:
-    - name: latest
-      from:
-        kind: DockerImage
-        name: openshiftio/launchpad-backend
-- kind: ImageStream
-  apiVersion: v1
-  metadata:
-    name: launchpad-frontend
-  spec:
-    tags:
-    - name: latest
-      from:
-        kind: DockerImage
-        name: openshiftio/launchpad-frontend
-- kind: ImageStream
-  apiVersion: v1
-  metadata:
     name: launchpad-missioncontrol
-  spec:
-    tags:
-    - name: latest
-      from:
-        kind: DockerImage
-        name: openshiftio/launchpad-missioncontrol
+  data:
+    openshift-clusters.yaml: |-
+      - id: starter-us-east-1
+        apiUrl: https://api.starter-us-east-1.openshift.com
+        consoleUrl: https://console.starter-us-east-1.openshift.com
+      - id: starter-us-west-1
+        apiUrl: https://api.starter-us-west-1.openshift.com
+        consoleUrl: https://console.starter-us-west-1.openshift.com
+      - id: starter-us-west-2
+        apiUrl: https://api.starter-us-west-2.openshift.com
+        consoleUrl: https://console.starter-us-west-2.openshift.com
+      - id: starter-ca-central-1
+        apiUrl: https://api.starter-ca-central-1.openshift.com
+        consoleUrl: https://console.starter-ca-central-1.openshift.com
+      - id: pro-us-east-1
+        apiUrl: https://api.pro-us-east-1.openshift.com
+        consoleUrl: https://console.pro-us-east-1.openshift.com
+
 - kind: DeploymentConfig
   apiVersion: v1
   metadata:
@@ -290,40 +205,44 @@ objects:
               configMapKeyRef:
                 name: launchpad
                 key: launchpad.tracker.segment.token
+          - name: LAUNCHPAD_MISSIONCONTROL_OPENSHIFT_CLUSTERS_FILE
+            value: /etc/openshift-clusters.yaml
           image: ${MISSIONCONTROL_IMAGE}:${MISSIONCONTROL_IMAGE_TAG}
           imagePullPolicy: Always
           name: launchpad-missioncontrol
           ports:
           - containerPort: 8080
             protocol: TCP
+          resources: {}
           terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /etc/openshift-clusters.yaml
+            subPath: openshift-clusters.yaml
+            name: configmap-volume
           readinessProbe:
             httpGet:
               path: /api/health/ready
               port: 8080
               scheme: HTTP
-            failureThreshold: 3
-            initialDelaySeconds: 120
-            periodSeconds: 10
-            successThreshold: 1
+            initialDelaySeconds: 60
+            periodSeconds: 20
             timeoutSeconds: 10
           livenessProbe:
             httpGet:
               path: /api/health/ready
               port: 8080
               scheme: HTTP
-            failureThreshold: 3
             initialDelaySeconds: 60
-            periodSeconds: 10
-            successThreshold: 1
+            periodSeconds: 20
             timeoutSeconds: 10
-          resources:
-            limits:
-              memory: 1Gi
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
         terminationGracePeriodSeconds: 30
+        volumes:
+        - name: configmap-volume
+          configMap:
+            name: launchpad-missioncontrol
     test: false
     triggers:
     - type: ConfigChange
@@ -341,14 +260,6 @@ objects:
       deploymentconfig: launchpad-missioncontrol
     sessionAffinity: None
     type: ClusterIP
-- kind: Route
-  apiVersion: v1
-  metadata:
-    name: launchpad-missioncontrol
-  spec:
-    to:
-      kind: Service
-      name: launchpad-missioncontrol
 - kind: DeploymentConfig
   apiVersion: v1
   metadata:
@@ -383,36 +294,38 @@ objects:
               configMapKeyRef:
                 name: launchpad
                 key: launchpad.backend.catalog.git.ref
+          - name: LAUNCHPAD_BACKEND_CATALOG_REINDEX_TOKEN
+            valueFrom:
+              configMapKeyRef:
+                name: launchpad
+                key: launchpad.backend.catalog.reindex.token
           image: ${BACKEND_IMAGE}:${BACKEND_IMAGE_TAG}
           imagePullPolicy: Always
           name: launchpad-backend
           ports:
           - containerPort: 8080
             protocol: TCP
+          resources: {}
           terminationMessagePath: /dev/termination-log
           readinessProbe:
             httpGet:
               path: /health/ready
               port: 8080
               scheme: HTTP
-            failureThreshold: 3
-            initialDelaySeconds: 300
-            periodSeconds: 10
-            successThreshold: 1
+            initialDelaySeconds: 60
+            periodSeconds: 20
             timeoutSeconds: 10
+          resources:
+            limits:
+              memory: 1500Mi
           livenessProbe:
             httpGet:
               path: /health/ready
               port: 8080
               scheme: HTTP
-            failureThreshold: 3
-            initialDelaySeconds: 300
-            periodSeconds: 10
-            successThreshold: 1
+            initialDelaySeconds: 60
+            periodSeconds: 20
             timeoutSeconds: 10
-          resources:
-            limits:
-              memory: 1500Mi
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
@@ -436,16 +349,6 @@ objects:
       service: launchpad-backend
     sessionAffinity: None
     type: ClusterIP
-- kind: Route
-  apiVersion: v1
-  metadata:
-    name: launchpad-backend
-  spec:
-    to:
-      kind: Service
-      name: launchpad-backend
-      weight: 100
-    wildcardPolicy: None
 - kind: DeploymentConfig
   apiVersion: v1
   metadata:
@@ -501,20 +404,16 @@ objects:
             httpGet:
               path: /wizard
               port: 8080
-            initialDelaySeconds: 120
+            initialDelaySeconds: 60
             timeoutSeconds: 10
-            failureThreshold: 3
-            periodSeconds: 10
-            successThreshold: 1
+            periodSeconds: 20
           livenessProbe:
             httpGet:
               path: /wizard
               port: 8080
             initialDelaySeconds: 60
             timeoutSeconds: 10
-            failureThreshold: 3
-            periodSeconds: 10
-            successThreshold: 1
+            periodSeconds: 20
         restartPolicy: Always
         dnsPolicy: ClusterFirst
         securityContext: {}
@@ -570,39 +469,27 @@ objects:
           run: launchpad-nginx
       spec:
         containers:
-        - image: registry.centos.org/kbsingh/openshift-nginx:latest
+        - image: ${PROXY_IMAGE}:${PROXY_IMAGE_TAG}
           imagePullPolicy: Always
           name: launchpad-nginx
           ports:
           - containerPort: 8080
             protocol: TCP
           terminationMessagePath: /dev/termination-log
-          volumeMounts:
-          - mountPath: /etc/nginx/nginx.conf
-            subPath: nginx.conf 
-            name: configmap-volume
           readinessProbe:
             httpGet:
               path: /wizard
               port: 8080
-            initialDelaySeconds: 120
+            initialDelaySeconds: 60
             timeoutSeconds: 10
-            failureThreshold: 3
-            periodSeconds: 10
-            successThreshold: 1
+            periodSeconds: 20
           livenessProbe:
             httpGet:
               path: /wizard
               port: 8080
             initialDelaySeconds: 60
             timeoutSeconds: 10
-            failureThreshold: 3
-            periodSeconds: 10
-            successThreshold: 1
-        volumes:
-        - name: configmap-volume
-          configMap:
-            name: launchpad-nginx
+            periodSeconds: 20
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
