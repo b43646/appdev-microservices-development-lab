@@ -317,7 +317,7 @@ objects:
             timeoutSeconds: 10
           resources:
             limits:
-              memory: 1500Mi
+              memory: 2000Mi
           livenessProbe:
             httpGet:
               path: /health/ready
