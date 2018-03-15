@@ -194,6 +194,7 @@ objects:
               - /bin/bash
               - -c
               - /opt/eap/bin/livenessProbe.sh
+            initialDelaySeconds: 60
           name: ${APPLICATION_NAME}
           ports:
           - containerPort: 8778
@@ -214,6 +215,9 @@ objects:
               - /bin/bash
               - -c
               - /opt/eap/bin/readinessProbe.sh
+          resources:
+            limits:
+              memory: ${MEMORY_LIMIT}
           volumeMounts:
           - mountPath: /etc/eap-secret-volume
             name: eap-keystore-volume
@@ -397,7 +401,7 @@ parameters:
   displayName: Database Volume Capacity
   name: VOLUME_CAPACITY
   required: true
-  value: 512Mi
+  value: 1Gi
 - description: The name of the secret containing the keystore file
   displayName: JGroups Secret Name
   name: JGROUPS_ENCRYPT_SECRET
@@ -465,3 +469,6 @@ parameters:
   name: POSTGRESQL_IMAGE_STREAM_TAG
   required: true
   value: "9.5"
+- description: Container memory limit
+  name: MEMORY_LIMIT
+  value: 1Gi

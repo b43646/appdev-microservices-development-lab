@@ -12,4 +12,6 @@ public interface ShoppingCartService {
 
     public ShoppingCart removeFromCart(String cartId, String itemId, int quantity);
 
+    public ShoppingCart checkoutShoppingCart(String cartId);
+
 }

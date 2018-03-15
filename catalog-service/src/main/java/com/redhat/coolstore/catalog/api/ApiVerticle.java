@@ -40,7 +40,7 @@ public class ApiVerticle extends AbstractVerticle {
         // * Use the `Router` as request handler
         // * Use the verticle configuration to obtain the port to listen to. 
         //   Get the configuration from the `config()` method of AbstractVerticle.
-        //   Look for the key "catalog.http.host", which returns an Integer. 
+        //   Look for the key "catalog.http.port", which returns an Integer. 
         //   The default value (if the key is not set in the configuration) is 8080.
         //  * If the HTTP server is correctly instantiated, complete the `Future`. If there is a failure, fail the `Future`. 
         //----

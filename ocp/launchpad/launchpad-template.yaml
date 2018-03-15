@@ -235,6 +235,9 @@ objects:
             initialDelaySeconds: 60
             periodSeconds: 20
             timeoutSeconds: 10
+          resources:
+            limits:
+              memory: 1000Mi            
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         securityContext: {}
